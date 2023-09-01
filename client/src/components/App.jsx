@@ -1,18 +1,16 @@
-import React from 'react';
 import axios from 'axios';
 
-class App extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-    };
+import DragDropFile from './DragDropFile.jsx';
+
+export default function App() {
+  function handleFile(file) {
+    axios.post('/api/genome', file)
+      .then((response) => {
+        console.log(response);
+      });
   }
 
-  render() {
-    return (
-      <>{"Hello world!"}</>
-    );
-  }
+  return (
+    <DragDropFile handleFile={handleFile}/>
+  );
 }
-
-export default App;
