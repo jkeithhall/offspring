@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS "Users" (
+﻿CREATE TABLE IF NOT EXISTS "Users" (
     "ID" int   NOT NULL,
     "Name" varchar(255)   NOT NULL,
     "Sex" char(1)   NOT NULL,
@@ -41,7 +41,5 @@ ALTER TABLE "SNPs" ADD CONSTRAINT "fk_SNPs_genome" FOREIGN KEY("genome")
 REFERENCES "Genomes" ("ID");
 
 CREATE INDEX "idx_Users_Name" ON "Users" ("Name");
-
-CREATE INDEX "idx_SNPs_genome" ON "SNPs" ("genome");
 
 CREATE INDEX "idx_genome_chromosome_position" ON "SNPs" ("genome", "chromosome", "position");

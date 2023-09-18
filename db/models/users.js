@@ -1,8 +1,10 @@
-import pg from 'pg';
-const { Client } = pg;
+import { client } from '../index.js';
 import fs from 'fs';
 import { from } from 'pg-copy-streams';
 import { pipeline } from 'node:stream/promises';
+import sockets from '../../server/index.js';
+import pg from 'pg';
+const { Client } = pg;
 import { clientConfig } from '../index.js';
 
 export async function snpFileUpload (filePath, name, cb) {
@@ -10,6 +12,7 @@ export async function snpFileUpload (filePath, name, cb) {
   await client.connect((err) => {
     if (err) {
       throw err;
+      console.log(err);
     } else {
       console.log('DB connected for file upload');
     }
