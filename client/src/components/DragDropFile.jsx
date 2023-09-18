@@ -26,8 +26,8 @@ export default function DragDropFile({handleFile}) {
       console.log("File dropped");
       handleFile(name, e.dataTransfer.files, (msg) => {
         const { data } = msg;
-        console.log("data: ", data);
-        setUploadProgress(data);
+        console.log("Progress: ", data);
+        setUploadProgress(parseFloat(data));
       });
     }
   };
@@ -39,8 +39,8 @@ export default function DragDropFile({handleFile}) {
       console.log("File selected for upload");
       handleFile(name, e.dataTransfer.files, (msg) => {
         const { data } = msg;
-        console.log("data: ", data);
-        setUploadProgress(data);
+        console.log("Progress: ", data);
+        setUploadProgress(parseFloat(data));
       });
     }
   };
