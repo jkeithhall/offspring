@@ -1,7 +1,9 @@
+import pg from 'pg';
+const { Client } = pg;
 import dotenv from 'dotenv';
 dotenv.config();
 
-export const clientConfig = {
+const clientConfig = {
     type: "postgres",
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
@@ -9,3 +11,15 @@ export const clientConfig = {
     password: `${process.env.DB_PASSWORD}`,
     database: process.env.DB_DATABASE_NAME,
   }
+export function connectToDB (connectMessage) {
+  const client = new Client(clientConfig);
+  client.connect((err) => {
+    if (err) {
+      console.log('Error connecting to DB: ', err);
+      throw err;
+    } else {
+      console.log(connectMessage);
+    }
+  });
+  return client;
+}

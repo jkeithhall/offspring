@@ -1,16 +1,19 @@
+import { connectToDB } from '../db/index.js';
+import { addUser } from '../db/models/users.js';
+import { addGenome } from '../db/models/genomes.js';
+import { copySnpFile } from '../db/models/snp.js';
 import { IncomingForm } from 'formidable';
 import path from 'path';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
-import { snpFileUpload } from '../db/models/snp.js';
 import { monitorUploadProgress } from '../db/models/monitoring.js';
 import { preprocessFile, deleteFiles } from './lib.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export async function newFileUpload (socket, req, res) {
-  const { name } = req.query;
+  const { name, sex } = req.query;
   const form = new IncomingForm({
     uploadDir: path.join(__dirname, 'temp'),
     keepExtensions: true,
@@ -31,16 +34,26 @@ export async function newFileUpload (socket, req, res) {
       console.log(`Unsupported media type (${mimetype}).`);
       res.status(415).send(`Unsupported media type (${mimetype}). Only .txt files allowed.`);
     }
-    preprocessFile(filepath, () => {
-      const refreshIntervalId = monitorUploadProgress(socket, size);
-
-      snpFileUpload(filepath, name, (status, message) => {
-        console.log(message);
+    const client = await connectToDB("Connected to DB for file upload");
+    preprocessFile(filepath, async () => {
+      try {
+        const refreshIntervalId = monitorUploadProgress(socket, size);
+        await client.query('BEGIN');
+        const user_id = await addUser(client, name, sex);
+        const genome_id = await addGenome(client, user_id);
+        await copySnpFile(client, filepath, genome_id);
         clearInterval(refreshIntervalId);
-        deleteFiles(filepath, () => {
-          res.status(status).send(message);
-        });
-      });
+        client.query('COMMIT');
+        res.status(200).send(`File ${originalFilename} uploaded successfully.`);
+      } catch (error) {
+        clearInterval(refreshIntervalId);
+        client.query('ROLLBACK');
+        console.error('Error uploading file: ', error);
+        res.status(500).send(`Error uploading file: ${error.message}`);
+      } finally {
+        socket.close();
+        deleteFiles(filepath);
+      }
     });
   });
 };

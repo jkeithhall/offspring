@@ -19,12 +19,10 @@ export function preprocessFile (filepath, cb) {
   });
 };
 
-export function  deleteFiles (filepath, cb) {
-  console.log('filepath', filepath);
+export function  deleteFiles (filepath) {
   unlink(filepath, () => {
     unlink(`${filepath}.original`, () => {
       console.log("Files deleted");
-      cb();
     });
   });
 };

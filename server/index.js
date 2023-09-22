@@ -8,7 +8,7 @@ import cors from 'cors';
 import { newFileUpload } from './controllers.js';
 import { getSocketKey } from './lib.js';
 
-const app = express();
+export const app = express();
 expressWS(app);
 
 export const sockets = {};

@@ -22,9 +22,10 @@ export default function DragDropFile({handleFile}) {
     e.stopPropagation();
     setDragActive(false);
     let name = "Keith Hall";
+    let sex = "M";
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       console.log("File dropped");
-      handleFile(name, e.dataTransfer.files, (msg) => {
+      handleFile(name, sex, e.dataTransfer.files, (msg) => {
         const { data } = msg;
         console.log("Progress: ", data);
         setUploadProgress(parseFloat(data));
@@ -34,10 +35,11 @@ export default function DragDropFile({handleFile}) {
 
   const handleChange = function(e) {
     let name = "Keith Hall";
+    let sex = "M";
     e.preventDefault();
     if (e.target.files && e.target.files[0]) {
       console.log("File selected for upload");
-      handleFile(name, e.dataTransfer.files, (msg) => {
+      handleFile(name, sex, e.dataTransfer.files, (msg) => {
         const { data } = msg;
         console.log("Progress: ", data);
         setUploadProgress(parseFloat(data));

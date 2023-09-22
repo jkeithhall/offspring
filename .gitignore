@@ -132,6 +132,9 @@ dist
 # Seed Data
 seed/
 
+# Test File
+server/tests/*.txt
+
 # Temporary Files
 temp/*.txt
 
