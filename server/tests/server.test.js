@@ -48,11 +48,14 @@ describe('Server Routes', () => {
   });
 });
 
-describe('File preprocessing', () => {
+describe('File preprocessing', function () {
+  this.timeout(10000);
   var initialLineCount = 0;
+  const filePath = path.join(__dirname, 'testFile.txt');
+  const copyPath = path.join(__dirname, 'testFileCopy.txt');
   before(() => {
-    fs.copyFileSync('./server/tests/testFile.txt', './server/tests/testFileCopy.txt');
-    fs.createReadStream('./server/tests/testFileCopy.txt')
+    fs.copyFileSync(filePath, copyPath);
+    fs.createReadStream(copyPath)
     .on('data', (chunk) => {
       for (let i = 0; i < chunk.length; i++) {
         // 10 is the ASCII code for a newline character
@@ -60,33 +63,30 @@ describe('File preprocessing', () => {
           initialLineCount++;
         }
       }
-    }).on('end', () => {
-      console.log('Initial line count:', initialLineCount);
     });
   });
 
   it('should remove the first 20 lines of a file', (done) => {
-    const filePath = path.join(__dirname, 'testFileCopy.txt');
-    preprocessFile(filePath, () => {
-      var lineCount = 0;
-      fs.createReadStream(filePath)
+    var lineCount = 0;
+    preprocessFile(copyPath, () => {
+      fs.createReadStream(copyPath)
       .on('data', (chunk) => {
         for (let i = 0; i < chunk.length; i++) {
           if (chunk[i] === 10) {
             lineCount++;
           }
         }
+      }).on('end', () => {
+        expect(lineCount).to.equal(initialLineCount - 20);
+        done();
       });
-      expect(lineCount).to.equal(initialLineCount - 20);
-      done();
     });
   });
 
   it('should delete the original file and its preprocessed copy', (done) => {
-    const filePath = './server/tests/testFileCopy.txt';
-    deleteFiles(filePath, () => {
-      expect(fs.existsSync(filePath)).to.equal(false);
-      expect(fs.existsSync(`${filePath}.original`)).to.equal(false);
+    deleteFiles(copyPath, () => {
+      expect(fs.existsSync(copyPath)).to.equal(false);
+      expect(fs.existsSync(`${copyPath}.original`)).to.equal(false);
       done();
     });
   });

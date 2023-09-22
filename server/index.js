@@ -22,9 +22,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors(CORS_OPTIONS));
 
-app.ws('/api/genome/', (socket, req) => {
+app.ws('/api/genome/', async (socket, req) => {
   try {
-    const key = getSocketKey(req);
+    const key = await getSocketKey(req);
     sockets[key] = socket;
     console.log(`Socket ${key} connected`);
 
@@ -36,9 +36,9 @@ app.ws('/api/genome/', (socket, req) => {
   }
 });
 
-app.post('/api/genome', (req, res) => {
+app.post('/api/genome', async (req, res) => {
   try {
-    const key = getSocketKey(req);
+    const key = await getSocketKey(req);
     newFileUpload(sockets[key], req, res);
   } catch (err) {
     console.error(err);
