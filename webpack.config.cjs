@@ -7,7 +7,7 @@ const isProduction = process.env.NODE_ENV;
 const stylesHandler = 'style-loader';
 
 const config = {
-  entry: path.join(__dirname, '/client/src/index.jsx'),
+  entry: path.join(__dirname, './client/src/index.tsx'),
   output: {
     filename: 'bundle.js',
     path: path.resolve(__dirname, 'client/dist'),
@@ -16,15 +16,20 @@ const config = {
     open: true,
     host: 'localhost',
   },
-  plugins: [
-    // Add your plugins here
-    // Learn more about plugins from https://webpack.js.org/configuration/plugins/
-  ],
+  resolve: {
+    extensions: ['.tsx', '.ts', '.js', '.jsx'],
+  },
+  devtool: 'source-map',
   module: {
     rules: [
       {
-        test: /\.(js|jsx)$/i,
-        loader: 'babel-loader',
+        test: /\.tsx$/i,
+        loader: 'ts-loader',
+      },
+      {
+        test: /\.js$/,
+        use: ["source-map-loader"],
+        enforce: "pre"
       },
       {
         test: /\.css$/i,
@@ -34,9 +39,6 @@ const config = {
         test: /\.(eot|svg|ttf|woff|woff2|png|jpg|gif)$/i,
         type: 'asset',
       },
-
-      // Add your rules for custom modules here
-      // Learn more about loaders from https://webpack.js.org/loaders/
     ],
   },
 };

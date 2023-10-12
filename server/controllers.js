@@ -8,12 +8,12 @@ import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import { monitorUploadProgress } from '../db/models/monitoring.js';
-import { preprocessFile, deleteFiles } from './lib.js';
+import { preprocessFile, deleteFiles, determineSex } from './lib.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export async function newFileUpload (socket, req, res) {
-  const { name, sex } = req.query;
+  const { name } = req.query;
   const form = new IncomingForm({
     uploadDir: path.join(__dirname, 'temp'),
     keepExtensions: true,
@@ -35,9 +35,10 @@ export async function newFileUpload (socket, req, res) {
       res.status(415).send(`Unsupported media type (${mimetype}). Only .txt files allowed.`);
     }
     const client = await connectToDB("Connected to DB for file upload");
+    const refreshIntervalId = monitorUploadProgress(socket, size);
     preprocessFile(filepath, async () => {
       try {
-        const refreshIntervalId = monitorUploadProgress(socket, size);
+        const sex = await determineSex(filepath);
         await client.query('BEGIN');
         const user_id = await addUser(client, name, sex);
         const genome_id = await addGenome(client, user_id);

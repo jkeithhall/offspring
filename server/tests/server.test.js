@@ -2,7 +2,7 @@ import chai from 'chai';
 import chaiHttp from 'chai-http';
 import WebSocket from 'ws';
 import { app, sockets } from '../index.js';
-import { getSocketKey } from '../lib.js';
+import { getSocketKey, determineSex } from '../lib.js';
 import { preprocessFile, deleteFiles } from '../lib.js';
 import fs from 'fs';
 import path from 'path';
@@ -10,6 +10,7 @@ import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const filePath = path.join(__dirname, 'testFile.txt');
 
 const expect = chai.expect;
 
@@ -48,10 +49,16 @@ describe('Server Routes', () => {
   });
 });
 
+describe('Sex determination', () => {
+  it('should determine sex from a file', async () => {
+    const sex = await determineSex(filePath);
+    expect(sex).to.equal('M');
+  });
+});
+
 describe('File preprocessing', function () {
-  this.timeout(10000);
+  this.timeout(5000);
   var initialLineCount = 0;
-  const filePath = path.join(__dirname, 'testFile.txt');
   const copyPath = path.join(__dirname, 'testFileCopy.txt');
   before(() => {
     fs.copyFileSync(filePath, copyPath);
