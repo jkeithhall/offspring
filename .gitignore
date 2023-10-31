@@ -80,8 +80,8 @@ web_modules/
 .nuxt
 
 # Bundle
-dist/bundle.js
-dist/bundle.js.map
+client/dist/bundle.js
+client/dist/bundle.js.map
 
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
