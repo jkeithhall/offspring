@@ -1,4 +1,4 @@
-export function copiesOfEffectAllele(genotype, effectAllele) {
+const copiesOfEffectAllele = function(genotype, effectAllele) {
   if (genotype === effectAllele + effectAllele) {
     return 2;
   } else if (genotype.includes(effectAllele)) {
@@ -8,15 +8,15 @@ export function copiesOfEffectAllele(genotype, effectAllele) {
   }
 };
 
-export function inverseLogit(logOdds) {
+const inverseLogit = function(logOdds) {
   return Math.exp(logOdds) / (1 + Math.exp(logOdds));
 };
 
-export function isHomozygous(genotype) {
+const isHomozygous = function(genotype) {
   return genotype[0] === genotype[1];
 }
 
-export function determineProbabilityBuckets(children, bucketSize, pgsScores) {
+const determineProbabilityBuckets = function(children, bucketSize, pgsScores) {
   const probabilityBuckets = {};
   for (var i = 0; i < 1; i += bucketSize) {
     const bucket = i.toFixed(3);
@@ -41,3 +41,5 @@ export function determineProbabilityBuckets(children, bucketSize, pgsScores) {
 
   return probabilityBuckets;
 }
+
+export { copiesOfEffectAllele, inverseLogit, isHomozygous, determineProbabilityBuckets };

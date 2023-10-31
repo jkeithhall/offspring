@@ -4,6 +4,7 @@ const { PORT } = process.env;
 
 import express from 'express';
 import expressWS from 'express-ws';
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { newFileUpload } from './controllers.js';
 import { getSocketKey } from './lib.js';
@@ -18,8 +19,7 @@ const CORS_OPTIONS = {
 };
 
 app.use(express.static('client/dist'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser())
 app.use(cors(CORS_OPTIONS));
 
 app.ws('/api/genome/', async (socket, req) => {

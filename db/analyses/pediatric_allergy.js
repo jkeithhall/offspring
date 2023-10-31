@@ -1,5 +1,5 @@
 import { inverseLogit, copiesOfEffectAllele, isHomozygous, determineProbabilityBuckets } from './utils.js';
-import { getSnpAtRsid } from '../models/snp.js';
+import Snp from '../models/snp.js';
 
 //  Currently hardcoding the pgsScores object, but this may be replaced with a database query
 const pgsScores = {
@@ -45,13 +45,15 @@ const pgsScores = {
   },
 };
 
-export async function determinePediatricAllergyHistogram(client, genome_id_1, genome_id_2) {
+export async function determinePediatricAllergyHistogram(genome_id_1, genome_id_2) {
   const children = [];
 
   try {
     for (const rsid in pgsScores) {
-      var genotype_1 = await getSnpAtRsid(client, rsid, genome_id_1);
-      var genotype_2 = await getSnpAtRsid(client, rsid, genome_id_2);
+      var rows = await Snp.get({ rsid, genome_id: genome_id_1 });
+      var genotype_1 = rows[0].genotype;
+      rows = await Snp.get({ rsid, genome_id: genome_id_2 });
+      var genotype_2 = rows[0].genotype;
 
       // if (genotype_1 === null || genotype_2 === null) {
       //   throw new Error('Genotype not found in parent');

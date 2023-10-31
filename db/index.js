@@ -11,7 +11,8 @@ const clientConfig = {
     password: `${process.env.DB_PASSWORD}`,
     database: process.env.DB_DATABASE_NAME,
   }
-export function connectToDB (connectMessage) {
+
+const connectToDB = function(connectMessage) {
   const client = new Client(clientConfig);
   client.connect((err) => {
     if (err) {
@@ -23,3 +24,7 @@ export function connectToDB (connectMessage) {
   });
   return client;
 }
+
+const client = connectToDB("Connected to DB");
+
+export { connectToDB, client }

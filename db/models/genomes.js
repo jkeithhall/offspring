@@ -1,11 +1,25 @@
+import Model from './models.js';
+import User from './users.js';
+import { createRandom32String } from './hashutils.js';
 
-export async function addGenome (client, user_id) {
-  try {
-    var { rows } = await client.query(`INSERT INTO genomes(user_id) VALUES (${user_id}) RETURNING id`);
-    const genome_id = rows[0].id;
-    console.log(`Added genome to database with genome ${genome_id}.`);
-    return genome_id;
-  } catch (err) {
-    throw err;
+class GenomeModel extends Model {
+  constructor() {
+    super('genomes');
   }
-};
+
+  async create(options) {
+    const { user_id } = options;
+    if (!user_id) {
+      const newUser = {
+        username: createRandom32String(),
+        password: createRandom32String(),
+      }
+      const [ user ] = await User.create(newUser);
+      options.user_id = user.id;
+    }
+    return super.create.call(this, options);
+  }
+}
+
+const Genome = new GenomeModel();
+export default Genome;

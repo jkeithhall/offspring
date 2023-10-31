@@ -1,11 +1,26 @@
+import { createHash, compareHash, createRandom32String } from './hashutils.js';
+import Model from './models.js';
 
-export async function addUser (client, name, sex) {
-  try {
-    var { rows } = await client.query(`INSERT INTO users(name, sex) VALUES ('${name}', '${sex}') RETURNING id`);
-    const user_id = rows[0].id;
-    console.log(`Added ${name} to database with user_id ${user_id}.`);
-    return user_id;
-  } catch (err) {
-    throw err;
+class UserModel extends Model {
+  constructor() {
+    super('users');
   }
-};
+
+  compare(attempted, password, salt) {
+    return compareHash(attempted, password, salt);
+  }
+
+  create({ username, password }) {
+    const salt = createRandom32String();
+
+    const newUser = {
+      username,
+      password: createHash(password, salt),
+      salt,
+    };
+    return super.create.call(this, newUser);
+  }
+}
+
+const User = new UserModel();
+export default User;

@@ -1,6 +1,6 @@
-import { getSnpAtRsid } from '../models/snp.js';
+import Snp from '../models/snps.js';
 
-export async function determineEyeColor (client, genome_id_1, genome_id_2) {
+export async function determineEyeColor (genome_id_1, genome_id_2) {
   const rsid = 'rs12913832';
   const colors = {
     'AA': {
@@ -21,8 +21,10 @@ export async function determineEyeColor (client, genome_id_1, genome_id_2) {
   };
 
   try {
-    var genotype_1 = await getSnpAtRsid(client, rsid, genome_id_1);
-    var genotype_2 = await getSnpAtRsid(client, rsid, genome_id_2);
+    var rows = await Snp.get({ rsid, genome_id: genome_id_1 });
+    var genotype_1 = rows[0].genotype;
+    rows = await Snp.get({ rsid, genome_id: genome_id_2 });
+    var genotype_2 = rows[0].genotype;
 
     // if (genotype_1 === null || genotype_2 === null) {
     //   throw new Error('Genotype not found in parent');

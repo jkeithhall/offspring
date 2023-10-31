@@ -1,7 +1,7 @@
-import { connectToDB } from '../db/index.js';
-import { addUser } from '../db/models/users.js';
-import { addGenome } from '../db/models/genomes.js';
-import { copySnpFile } from '../db/models/snp.js';
+import { client, connectToDB } from '../db/index.js';
+import User from '../db/models/users.js';
+import Genome from '../db/models/genomes.js';
+import Snp from '../db/models/snps.js';
 import { IncomingForm } from 'formidable';
 import path from 'path';
 import { dirname } from 'path';
@@ -27,22 +27,23 @@ export async function newFileUpload (socket, req, res) {
       res.status(400).send("There was an error parsing the files");
       return;
     }
-    const file = files['files[]'][0];
+    const [ file ] = files['files[]'];
     const { mimetype, filepath, originalFilename, size } = file;
     console.log(`Receiving file ${originalFilename}...`);
     if (mimetype !== "text/plain") {
       console.log(`Unsupported media type (${mimetype}).`);
       res.status(415).send(`Unsupported media type (${mimetype}). Only .txt files allowed.`);
     }
-    const client = await connectToDB("Connected to DB for file upload");
     const refreshIntervalId = monitorUploadProgress(socket, size);
     preprocessFile(filepath, async () => {
       try {
         const sex = await determineSex(filepath);
         await client.query('BEGIN');
-        const user_id = await addUser(client, name, sex);
-        const genome_id = await addGenome(client, user_id);
-        await copySnpFile(client, filepath, genome_id);
+        const username = 'testuser';
+        const password = 'testpassword';
+        // TODO: Change to first look up session to get user_id...
+        const rows = await Genome.create({ name, sex });
+        await Snp.copySnpFile(filepath, rows[0].id);
         clearInterval(refreshIntervalId);
         client.query('COMMIT');
         res.status(200).send(`File ${originalFilename} uploaded successfully.`);
