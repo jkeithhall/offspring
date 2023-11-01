@@ -77,7 +77,11 @@ export async function createSession (req, res, next) {
     next();
   } catch (err) {
     const [ session ] = await Session.create();
-    res.cookie('offspring_id', session.hash);
+    const options = {
+      maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
+      httpOnly: true
+    };
+    res.cookie('offspring_id', session.hash, options);
     req.session = session;
     next();
   }

@@ -16,30 +16,14 @@ const isHomozygous = function(genotype) {
   return genotype[0] === genotype[1];
 }
 
-const determineProbabilityBuckets = function(children, bucketSize, pgsScores) {
-  const probabilityBuckets = {};
-  for (var i = 0; i < 1; i += bucketSize) {
-    const bucket = i.toFixed(3);
-    probabilityBuckets[bucket] = 0;
-  }
-
-  for (const child of children) {
-    const { histogramWeight, snps } = child;
-    const logOdds = Object.entries(snps).reduce((prevLogOdds, [rsid, genotype]) => {
-      const { effect_allele, effect_weight } = pgsScores[rsid];
-      const copies = copiesOfEffectAllele(genotype, effect_allele);
-      return prevLogOdds + copies * effect_weight;
-    }, 0);
-    const probability = inverseLogit(logOdds);
-    for (const bucket in probabilityBuckets) {
-      if (probability >= parseFloat(bucket) && probability < parseFloat(bucket) + bucketSize) {
-        probabilityBuckets[bucket] += histogramWeight;
-        break;
-      }
-    }
-  }
-
-  return probabilityBuckets;
+const determineProbability = function(person, pgsScores) {
+  const { snps } = person;
+  const logOdds = Object.entries(snps).reduce((prevLogOdds, [rsid, genotype]) => {
+    const { effect_allele, effect_weight } = pgsScores[rsid];
+    const copies = copiesOfEffectAllele(genotype, effect_allele);
+    return prevLogOdds + copies * effect_weight;
+  }, 0);
+  return inverseLogit(logOdds);
 }
 
-export { copiesOfEffectAllele, inverseLogit, isHomozygous, determineProbabilityBuckets };
+export { copiesOfEffectAllele, inverseLogit, isHomozygous, determineProbability };

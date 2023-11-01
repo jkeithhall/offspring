@@ -1,6 +1,7 @@
 import Model from './models.js';
 import User from './users.js';
 import { createHash, createRandom32String } from './hashutils.js';
+import { faker } from '@faker-js/faker';
 
 class GenomeModel extends Model {
   constructor() {
@@ -11,7 +12,7 @@ class GenomeModel extends Model {
     const { user_id } = options;
     if (!user_id) {
       const newUser = {
-        username: createRandom32String(),
+        username: faker.internet.userName(),
         password: createRandom32String(),
       }
       const [ user ] = await User.create(newUser);
