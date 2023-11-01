@@ -1,6 +1,6 @@
 import Model from './models.js';
 import User from './users.js';
-import { createRandom32String } from './hashutils.js';
+import { createHash, createRandom32String } from './hashutils.js';
 
 class GenomeModel extends Model {
   constructor() {

@@ -7,7 +7,7 @@ import expressWS from 'express-ws';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { newFileUpload } from './controllers.js';
-import { getSocketKey } from './lib.js';
+import { getSocketKey, createSession } from './lib.js';
 
 export const app = express();
 expressWS(app);
@@ -18,18 +18,19 @@ const CORS_OPTIONS = {
   origin: `http://localhost:${PORT}`
 };
 
-app.use(express.static('client/dist'));
-app.use(cookieParser())
 app.use(cors(CORS_OPTIONS));
+app.use(cookieParser())
+app.use(createSession);
+app.use(getSocketKey);
+app.use(express.static('client/dist'));
 
 app.ws('/api/genome/', async (socket, req) => {
   try {
-    const key = await getSocketKey(req);
-    sockets[key] = socket;
-    console.log(`Socket ${key} connected`);
+    const { socketKey } = req;
+    sockets[socketKey] = socket;
 
     socket.on('close', () => {
-      delete sockets[key];
+      delete sockets[socketKey];
     });
   } catch (err) {
     console.error(err);
@@ -38,8 +39,8 @@ app.ws('/api/genome/', async (socket, req) => {
 
 app.post('/api/genome', async (req, res) => {
   try {
-    const key = await getSocketKey(req);
-    newFileUpload(sockets[key], req, res);
+    const { socketKey } = req;
+    newFileUpload(sockets[socketKey], req, res);
   } catch (err) {
     console.error(err);
     res.status(500).send(`ERROR: ${err.message}`);

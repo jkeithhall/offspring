@@ -1,4 +1,4 @@
-import { createHash, compareHash, createRandom32String } from './hashutils.js';
+import { createHash, createRandom32String } from './hashutils.js';
 import Model from './models.js';
 import User from './users.js';
 
@@ -7,28 +7,20 @@ class SessionModel extends Model {
     super('sessions');
   }
 
-  create({ user_id }) {
-    let data = createRandom32String();
-    let hash = createHash(data);
-    return super.create.call(this, { hash, user_id });
-  }
-
-  get(options) {
-    return new Promise(resolve => {
-      resolve(super.get.call(this, options));
-    })
-    .then(rows => {
-      const [ session ] = rows;
-      if (!session || !session.user_id) {
-        return session;
+  async create(options) {
+    if (!options || !options.user_id) {
+      const newUser = {
+        username: createRandom32String(),
+        password: createRandom32String(),
       }
-      return User.get({ id: session.user_id })
-        .then(rows => {
-          const [ user ] = rows;
-          session.user = user;
-          return session;
-        });
-    })
+      const [ user ] = await User.create(newUser);
+      options = { user_id: user.id };
+    }
+
+    const hash = createHash(createRandom32String());
+    options.hash = hash;
+
+    return super.create.call(this, options);
   }
 }
 

@@ -13,7 +13,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export async function newFileUpload (socket, req, res) {
+  const { session } = req;
+  const { user_id } = session;
   const { name } = req.query;
+
   const form = new IncomingForm({
     uploadDir: path.join(__dirname, 'temp'),
     keepExtensions: true,
@@ -27,25 +30,26 @@ export async function newFileUpload (socket, req, res) {
       res.status(400).send("There was an error parsing the files");
       return;
     }
+
     const [ file ] = files['files[]'];
     const { mimetype, filepath, originalFilename, size } = file;
-    console.log(`Receiving file ${originalFilename}...`);
     if (mimetype !== "text/plain") {
       console.log(`Unsupported media type (${mimetype}).`);
       res.status(415).send(`Unsupported media type (${mimetype}). Only .txt files allowed.`);
     }
+
     const refreshIntervalId = monitorUploadProgress(socket, size);
+
     preprocessFile(filepath, async () => {
       try {
         const sex = await determineSex(filepath);
+
         await client.query('BEGIN');
-        const username = 'testuser';
-        const password = 'testpassword';
-        // TODO: Change to first look up session to get user_id...
-        const rows = await Genome.create({ name, sex });
+        const rows = await Genome.create({ user_id, name, sex });
         await Snp.copySnpFile(filepath, rows[0].id);
         clearInterval(refreshIntervalId);
         client.query('COMMIT');
+
         res.status(200).send(`File ${originalFilename} uploaded successfully.`);
       } catch (error) {
         clearInterval(refreshIntervalId);

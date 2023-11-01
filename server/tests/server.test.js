@@ -1,8 +1,10 @@
+import express from 'express';
 import chai from 'chai';
 import chaiHttp from 'chai-http';
+import supertest from 'supertest';
 import WebSocket from 'ws';
 import { app, sockets } from '../index.js';
-import { getSocketKey, determineSex, preprocessFile, deleteFiles } from '../lib.js';
+import { getSocketKey, determineSex, preprocessFile, deleteFiles, createSession } from '../lib.js';
 import fs from 'fs';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -24,69 +26,6 @@ chai.use(chaiHttp);
 before(async () => {
   // Create test database
   await client.query('CREATE TABLE test (id SERIAL PRIMARY KEY, name VARCHAR(255));');
-  console.log('Created test table');
-});
-
-describe('Server Routes', () => {
-  describe('Websocket Route', () => {
-    it('should connect a socket', (done) => {
-      const ws = new WebSocket('ws://localhost:3000/api/genome/');
-      ws.onopen = () => {
-        expect(ws.readyState).to.equal(1);
-        done();
-      };
-    });
-  });
-
-  describe('getSocketKey Function', () => {
-    it('should generate a valid socket key', async () => {
-      const req = {
-        query: { name: 'testName' },
-        headers: { origin: 'http://example.com' }
-      };
-      const key = await getSocketKey(req);
-      expect(key).to.be.a('string');
-    });
-    it('should generate the same socket keys for the same inputs', async () => {
-      const req = {
-        query: { name: 'testName' },
-        headers: { origin: 'http://example.com' }
-      };
-      const key1 = await getSocketKey(req);
-      const key2 = await getSocketKey(req);
-      expect(key2).to.equal(key1);
-      // Add more assertions as needed
-    });
-  });
-});
-
-describe('Sex determination', () => {
-  it('should determine sex from a file', async () => {
-    const sex = await determineSex(filePath);
-    expect(sex).to.equal('M');
-  });
-});
-
-describe.skip('File Upload Route', function () {
-  before(() => {
-    const ws = new WebSocket('ws://localhost:3000/api/genome/');
-  });
-  this.timeout(20000);
-
-  it('should upload a file', (done) => {
-    const name = 'testName';
-    chai.request(app)
-      .post(`/api/genome?name=${name}`)
-      .attach('file', './server/tests/testFile.txt')
-      .end((err, res) => {
-        if (err) {
-          console.error(err);
-        }
-        expect(res.status).to.equal(200);
-        expect(res.text).to.equal('File uploaded to database!');
-        done();
-      });
-  });
 });
 
 // Hash util tests
@@ -253,9 +192,8 @@ describe('Sessions model', () => {
   });
 
   it('should retrieve a session', async () => {
-    const session = await Session.get({ user_id });
-    expect(session.user.id).to.equal(user_id);
-    expect(session.user.username).to.equal(username);
+    const [ session ] = await Session.get({ user_id });
+    expect(session.user_id).to.equal(user_id);
   });
 
   it('should delete a session', async () => {
@@ -264,6 +202,91 @@ describe('Sessions model', () => {
     await User.delete({ username });
     const finalCount = (await Session.getAll()).length;
     expect(finalCount).to.equal(initialCount - 1);
+  });
+});
+
+describe('Middleware', () => {
+  const testApp = express();
+  const name = 'testName';
+  testApp.use(createSession);
+  testApp.use(getSocketKey);
+  let user_id;
+
+  it('should create a session', async () => {
+    supertest(testApp).post(`/api/genome?name=${name}`)
+    .end((err, res) => {
+      expect(res.req.session).to.be.an('object');
+      user_id = res.req.session.user_id;
+      expect(res.req.session.user_id).to.be.a('number');
+    });
+  });
+
+  it('should return the same session for the same inputs', async () => {
+    supertest(testApp).post(`/api/genome?name=${name}`)
+    .end((err, res) => {
+      expect(res.req.session.user_id).to.equal(user_id);
+    });
+  });
+
+  it('should generate a valid socket key on the req object', async () => {
+    supertest(testApp).post(`/api/genome?name=${name}`)
+    .end((err, res) => {
+      expect(res.req.socketKey).to.be.a('string');
+      expect(res.req.socketKey.length).to.equal(64);
+    });
+  });
+
+  it('should generate the same socket keys for the same inputs', async () => {
+    let socketKey1;
+    let socketKey2;
+    supertest(testApp).post(`/api/genome?name=${name}`)
+    .end((err, res) => {
+      socketKey1 = res.req.socketKey;
+    });
+    supertest(testApp).post(`/api/genome?name=${name}`)
+    .end((err, res) => {
+      socketKey2 = res.req.socketKey;
+    });
+    expect(socketKey1).to.equal(socketKey2);
+  });
+});
+
+describe('Websocket Route', () => {
+  it('should connect a socket', (done) => {
+    const ws = new WebSocket('ws://localhost:3000/api/genome/');
+    ws.onopen = () => {
+      expect(ws.readyState).to.equal(1);
+      done();
+    };
+  });
+});
+
+describe('Sex determination', () => {
+  it('should determine sex from a file', async () => {
+    const sex = await determineSex(filePath);
+    expect(sex).to.equal('M');
+  });
+});
+
+describe.skip('File Upload Route', function () {
+  before(() => {
+    const ws = new WebSocket('ws://localhost:3000/api/genome/');
+  });
+  this.timeout(20000);
+
+  it('should upload a file', (done) => {
+    const name = 'testName';
+    chai.request(app)
+      .post(`/api/genome?name=${name}`)
+      .attach('file', './server/tests/testFile.txt')
+      .end((err, res) => {
+        if (err) {
+          console.error(err);
+        }
+        expect(res.status).to.equal(200);
+        expect(res.text).to.equal('File uploaded to database!');
+        done();
+      });
   });
 });
 
