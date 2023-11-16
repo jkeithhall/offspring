@@ -1,18 +1,16 @@
 import { client, connectToDB } from '../db/index.js';
-import User from '../db/models/users.js';
+import { IncomingForm } from 'formidable';
 import Genome from '../db/models/genomes.js';
 import Snp from '../db/models/snps.js';
-import { IncomingForm } from 'formidable';
-import path from 'path';
-import { dirname } from 'path';
+import { monitorUploadProgress } from '../db/monitoring.js';
+import { preprocessFile, deleteFiles } from './lib.js';
+import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { exec } from 'child_process';
-import { monitorUploadProgress } from '../db/models/monitoring.js';
-import { preprocessFile, deleteFiles, determineSex } from './lib.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-export async function newFileUpload (socket, req, res) {
+export async function uploadFile (socket, req, res) {
   const { session } = req;
   const { user_id } = session;
   const { name } = req.query;
@@ -28,38 +26,39 @@ export async function newFileUpload (socket, req, res) {
     if (err) {
       console.log(`Error parsing files: ${err.message}`);
       res.status(400).send("There was an error parsing the files");
-      return;
     }
-
+    // Determine if file is valid
     const [ file ] = files['files[]'];
-    const { mimetype, filepath, originalFilename, size } = file;
+    const { mimetype, filepath, originalFilename } = file;
     if (mimetype !== "text/plain") {
       console.log(`Unsupported media type (${mimetype}).`);
       res.status(415).send(`Unsupported media type (${mimetype}). Only .txt files allowed.`);
     }
 
-    const refreshIntervalId = monitorUploadProgress(socket, size);
+    let refreshIntervalId;
+    try {
+      // Create new genome in database
+      const [ genome ] = await Genome.create({ user_id, name });
+      const genome_id = genome.id;
 
-    preprocessFile(filepath, async () => {
-      try {
-        const sex = await determineSex(filepath);
+      // Preprocess file (remove comments, add genome_id, determine sex and file size)
+      const { sex, size } = await preprocessFile(filepath, genome_id);
 
-        await client.query('BEGIN');
-        const rows = await Genome.create({ user_id, name, sex });
-        await Snp.copySnpFile(filepath, rows[0].id);
+      // Upload preprocessed file and monitor upload progress
+      refreshIntervalId = await monitorUploadProgress(socket, size);
+      await Snp.copySnpFile(`${filepath}.preprocessed`);
+      clearInterval(refreshIntervalId);
+
+      res.status(200).send(`File ${originalFilename} uploaded successfully.`);
+    } catch (err) {
+      if (refreshIntervalId !== undefined) {
         clearInterval(refreshIntervalId);
-        client.query('COMMIT');
-
-        res.status(200).send(`File ${originalFilename} uploaded successfully.`);
-      } catch (error) {
-        clearInterval(refreshIntervalId);
-        client.query('ROLLBACK');
-        console.error('Error uploading file: ', error);
-        res.status(500).send(`Error uploading file: ${error.message}`);
-      } finally {
-        socket.close();
-        deleteFiles(filepath, () => {});
       }
-    });
+      console.error('Error uploading file: ', err.message);
+      res.status(500).send(`Error uploading file: ${err.message}`);
+    } finally {
+      socket.close();
+      deleteFiles(filepath);
+    }
   });
 };

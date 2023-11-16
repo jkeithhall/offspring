@@ -2,7 +2,7 @@ import { client } from '../index.js';
 import Snp from '../models/snps.js';
 import { isHomozygous, determineProbability } from '../utils.js';
 
-class Analysis {
+export default class Analysis {
   constructor(name, genome_id_1, genome_id_2) {
     this.name = name;
     this.pgsScores = {};

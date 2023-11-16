@@ -1,13 +1,13 @@
 import dotenv from 'dotenv';
-dotenv.config();
-const { PORT } = process.env;
-
 import express from 'express';
 import expressWS from 'express-ws';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import { newFileUpload } from './controllers.js';
+import { uploadFile } from './controllers.js';
 import { getSocketKey, createSession } from './lib.js';
+
+dotenv.config();
+const { PORT } = process.env;
 
 export const app = express();
 expressWS(app);
@@ -40,7 +40,7 @@ app.ws('/api/genome/', async (socket, req) => {
 app.post('/api/genome', async (req, res) => {
   try {
     const { socketKey } = req;
-    newFileUpload(sockets[socketKey], req, res);
+    uploadFile(sockets[socketKey], req, res);
   } catch (err) {
     console.error(err);
     res.status(500).send(`ERROR: ${err.message}`);

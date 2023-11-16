@@ -1,66 +1,79 @@
-import { exec } from 'child_process';
-import { unlink, createReadStream } from 'fs';
+import { unlink, createReadStream, createWriteStream, stat } from 'fs';
 import crypto from 'crypto-js/sha256.js';
 import { createInterface } from 'readline';
-import Session from '../db/models/sessions.js'
+import Session from '../db/models/sessions.js';
+import Genome from '../db/models/genomes.js';
 
-export function preprocessFile (filepath, cb) {
-  exec(`sed -i'.original' -e '1,20d' ${filepath}`,  (error, stdout, stderr) => {
-    if (error) {
-      res.status(500).send(`Error: ${error.message}`);
-      console.error(`Error: ${error.message}`);
-      return;
-    }
-    if (stderr) {
-      res.status(500).send(`Error: ${stderr}`);
-      console.error(`Error: ${stderr}`);
-      return;
-    }
-    cb();
-  });
-};
+// This function preprocesses the file by removing commented lines, adding the genome_id to each line,
+// determining the sex of the genome, and returning the genome_id and sex.
+export function preprocessFile (filepath, genome_id) {
+  return new Promise((resolve, reject) => {
 
-export function  deleteFiles (filepath, cb) {
-  unlink(filepath, () => {
-    unlink(`${filepath}.original`, () => {
-      cb();
+    let sex;
+
+    const input = createReadStream(filepath);
+    const output = createWriteStream(`${filepath}.preprocessed`);
+    const rl = createInterface({
+      input,
+      output,
+      crlfDelay: Infinity,
+    });
+
+    rl.on('line', (line) => {
+      if (!line.startsWith('#')) {
+        const columns = line.split('\t');
+        const [ rsid, chromosome ] = columns;
+        if (sex === undefined && chromosome === 'Y') {
+          sex = 'M';
+        }
+        columns.splice(1, 0, genome_id);
+        const modifiedLine = columns.join('\t') + '\n';
+        output.write(modifiedLine);
+      }
+    });
+
+    rl.on('close', async () => {
+      // Update genome with sex
+      if (sex === undefined) { sex = 'F'; }
+      await Genome.update({ id: genome_id }, { sex });
+
+      // Get new file size
+      const size = await getFileSize(`${filepath}.preprocessed`);
+      resolve({ sex, size });
+    });
+
+    rl.on('error', error => {
+      console.log(`Error preprocessing file: ${error.message}`);
+      reject(error);
     });
   });
 };
+
+export function deleteFiles (filepath) {
+  unlink(filepath, () => {
+    unlink(`${filepath}.original`, () => {
+      unlink(`${filepath}.preprocessed`, ()  => {});
+    });
+  });
+};
+
+export function getFileSize (filepath) {
+  return new Promise((resolve, reject) => {
+    stat(filepath, (err, stats) => {
+      if (err) {
+        console.log(`Error getting file size: ${err.message}`);
+        reject(err);
+      }
+      resolve(stats.size);
+    });
+  });
+}
 
 export async function getSocketKey (req, res, next) {
   const { name } = req.query;
   const { offspring_id } = req.cookies;
   req.socketKey = await crypto(offspring_id + name).toString();
   next();
-};
-
-export async function determineSex (filepath) {
-  let xCount = 0;
-  let yCount = 0;
-
-  try {
-    const fileStream = createReadStream(filepath);
-    const rl = createInterface({
-      input: fileStream,
-      crlfDelay: Infinity,
-    });
-
-    var sex = 'F';
-    for await (const line of rl) {
-      const [ rsid, chromosome ] = line.split('\t');
-
-      if (chromosome === 'Y') {
-        sex = 'M';
-        break;
-      }
-    }
-    await fileStream.close();
-    return sex;
-
-  } catch (error) {
-    throw error;
-  }
 };
 
 export async function createSession (req, res, next) {
