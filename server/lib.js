@@ -49,10 +49,10 @@ export function preprocessFile (filepath, genome_id) {
   });
 };
 
-export function deleteFiles (filepath) {
+export function deleteFiles (filepath, cb) {
   unlink(filepath, () => {
-    unlink(`${filepath}.original`, () => {
-      unlink(`${filepath}.preprocessed`, ()  => {});
+    unlink(`${filepath}.preprocessed`, () => {
+      unlink(`${filepath}.original`, cb);
     });
   });
 };

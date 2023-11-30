@@ -1,6 +1,6 @@
-import { client } from '../index.js';
-import Snp from '../models/snps.js';
-import { isHomozygous, determineProbability } from '../utils.js';
+import pgClient from '../postgresDB.js';
+import PgsScoreModel from '../analysisDB.js';
+import { isHomozygous, determineProbability } from './utils.js';
 
 export default class Analysis {
   constructor(name, genome_id_1, genome_id_2) {
@@ -13,8 +13,9 @@ export default class Analysis {
 
   async fetchPgsScores() {
     try {
-      // To do: create a pgs_scores database (maybe change to mongoDB...)
-      const rows = await client.query(`SELECT * FROM pgs_scores WHERE analysis = '${this.name}'`);
+      // const rows = await pgClient.query(`SELECT * FROM pgs_scores WHERE analysis = '${this.name}'`);
+      const rows = await PgsScoreModel.findOne({ name: this.name });
+      console.log('rows:', rows);
       rows.forEach(row => {
         const { rsid, effect_allele, effect_weight } = row;
         this.pgsScores[rsid] = { effect_allele, effect_weight };
@@ -30,12 +31,13 @@ export default class Analysis {
     try {
       for (const rsid in this.pgsScores) {
         const genome_id_1 = this.parent_1.genome_id;
-        const [ snp_1 ] = await Snp.get({ rsid, genome_id: genome_id_1 });
+        const query = `SELECT * FROM snps WHERE rsid = $1 AND genome_id = $2`;
+        const [ snp_1 ] = await pgClient.query(query, [rsid, genome_id_1]);
         var genotype_1 = snp_1.genotype;
         this.parent_1[rsid] = genotype_1;
 
         const genome_id_2 = this.parent_2.genome_id;
-        const [ snp_2 ] = await Snp.get({ rsid, genome_id: genome_id_2 });
+        const [ snp_2 ] = await pgClient.query(query, [rsid, genome_id_2]);
         var genotype_2 = snp_2.genotype;
         this.parent_2[rsid] = genotype_2;
 

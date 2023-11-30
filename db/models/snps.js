@@ -21,8 +21,10 @@ const executeCopySnpFileWorker = async function (filePath) {
 
 if (!isMainThread) {
   const { filePath } = workerData;
-  await executeCopySnpFileWorker(filePath);
-  parentPort.postMessage({ message: `File ${filePath} uploaded successfully.` });
+  (async() => {
+    await executeCopySnpFileWorker(filePath);
+    parentPort.postMessage({ message: `File ${filePath} uploaded successfully.` });
+  })();
 }
 
 class SnpModel extends Model {

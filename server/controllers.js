@@ -58,7 +58,7 @@ export async function uploadFile (socket, req, res) {
       res.status(500).send(`Error uploading file: ${err.message}`);
     } finally {
       socket.close();
-      deleteFiles(filepath);
+      deleteFiles(filepath, () => {});
     }
   });
 };

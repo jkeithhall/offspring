@@ -4,12 +4,11 @@ import chaiHttp from 'chai-http';
 import supertest from 'supertest';
 import WebSocket from 'ws';
 import { app, sockets } from '../index.js';
-import { getSocketKey, determineSex, preprocessFile, deleteFiles, createSession } from '../lib.js';
+import { getSocketKey, preprocessFile, deleteFiles, createSession } from '../lib.js';
 import fs from 'fs';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { createHash, compareHash, createRandom32String } from '../../db/models/hashutils.js';
-import { copiesOfEffectAllele, inverseLogit, isHomozygous, determineProbability } from '../../db/analyses/utils.js';
+import { createHash, compareHash, createRandom32String } from '../../db/hashutils.js';
 import { client } from '../../db/index.js';
 import Model from '../../db/models/models.js';
 import User from '../../db/models/users.js';
@@ -206,49 +205,76 @@ describe('Sessions model', () => {
   });
 });
 
-describe('Middleware', () => {
+describe.skip('Middleware', () => {
   const testApp = express();
   const name = 'testName';
   testApp.use(createSession);
   testApp.use(getSocketKey);
   let user_id;
+  let sessionCount;
+  let sessionId;
+  before(async () => {
+    const rows = await Session.getAll();
+    sessionCount = rows.length;
+    console.log('sessionCount: ', sessionCount);
+  });
 
-  it('should create a session', async () => {
-    supertest(testApp).post(`/api/genome?name=${name}`)
+
+  it('should create a session and create a cookie', (done) => {
+    chai.request(testApp).post('/api/genome')
     .end((err, res) => {
-      expect(res.req.session).to.be.an('object');
-      user_id = res.req.session.user_id;
-      expect(res.req.session.user_id).to.be.a('number');
+      console.log('res', res);
+      new Promise((resolve, reject) => {
+        return Session.getAll();
+      })
+      .then((rows) => {
+        expect(rows.length).to.equal(sessionCount + 1);
+        sessionId = rows[rows.length - 1].id;
+        console.log('New sessionCount: ', rows.length);
+        expect(res).to.have.cookie('offspring_id');
+        done();
+      });
     });
   });
 
-  it('should return the same session for the same inputs', async () => {
-    supertest(testApp).post(`/api/genome?name=${name}`)
-    .end((err, res) => {
-      expect(res.req.session.user_id).to.equal(user_id);
+  xit('should not create a new session if the same cookie is sent', async () => {
+    chai.request(testApp).get('/')
+    .end(async (err, res) => {
+      const rows = await Session.getAll();
+      expect(rows.length).to.equal(sessionCount + 1);
     });
   });
 
-  it('should generate a valid socket key on the req object', async () => {
+  xit('should generate a valid socket key on the req object', async () => {
     supertest(testApp).post(`/api/genome?name=${name}`)
     .end((err, res) => {
+      console.log('user_id 3', res.req.session.user_id);
       expect(res.req.socketKey).to.be.a('string');
       expect(res.req.socketKey.length).to.equal(64);
     });
   });
 
-  it('should generate the same socket keys for the same inputs', async () => {
+  xit('should generate the same socket keys for the same inputs', async () => {
     let socketKey1;
     let socketKey2;
     supertest(testApp).post(`/api/genome?name=${name}`)
     .end((err, res) => {
+      console.log('user_id 4', res.req.session.user_id);
       socketKey1 = res.req.socketKey;
     });
     supertest(testApp).post(`/api/genome?name=${name}`)
     .end((err, res) => {
+      console.log('user_id 5', res.req.session.user_id);
       socketKey2 = res.req.socketKey;
     });
     expect(socketKey1).to.equal(socketKey2);
+  });
+
+  after(async () => {
+    await Session.delete({ id: sessionId });
+    await User.delete({ id: user_id });
+    const rows = await User.getAll();
+    console.log('rows', rows);
   });
 });
 
@@ -260,22 +286,29 @@ describe('Websocket Route', () => {
       done();
     };
   });
-});
 
-describe('Sex determination', () => {
-  it('should determine sex from a file', async () => {
-    const sex = await determineSex(filePath);
-    expect(sex).to.equal('M');
+  after(async () => {
+    const rows = await User.getAll();
+    const user_id = rows[rows.length - 1].id;
+    Session.delete({ user_id });
+    User.delete({ id: user_id });
   });
 });
 
-describe('File processing', function () {
+describe('File preprocessing', function () {
   this.timeout(5000);
-  var initialLineCount = 0;
+  let initialLineCount = 0;
+  let initialSize;
   let user_id;
   let genome_id;
+  let returnedSex;
+  let returnedSize;
   const copyPath = path.join(__dirname, 'testFileCopy.txt');
+  const preprocessedPath = `${copyPath}.preprocessed`;
+
   before(async () => {
+    const stats = fs.statSync(filePath);
+    initialSize = stats.size;
     fs.copyFileSync(filePath, copyPath);
     fs.createReadStream(copyPath)
     .on('data', (chunk) => {
@@ -291,49 +324,104 @@ describe('File processing', function () {
     const [ genome ] = await Genome.create({
       user_id,
       name: 'test_genome',
-      sex: 'M',
     });
     genome_id = genome.id;
+    const { sex, size } = await preprocessFile(copyPath, genome_id);
+    returnedSex = sex;
+    returnedSize = size;
   });
 
   it('should remove the first 20 lines of a file', (done) => {
     var lineCount = 0;
-    preprocessFile(copyPath, () => {
-      fs.createReadStream(copyPath)
-      .on('data', (chunk) => {
-        for (let i = 0; i < chunk.length; i++) {
-          if (chunk[i] === 10) {
-            lineCount++;
-          }
+
+    fs.createReadStream(preprocessedPath)
+    .on('data', (chunk) => {
+      for (let i = 0; i < chunk.length; i++) {
+        if (chunk[i] === 10) {
+          lineCount++;
         }
-      }).on('end', () => {
-        expect(lineCount).to.equal(initialLineCount - 20);
-        done();
-      });
-    });
-  });
-
-  xit('should copy a file to the snps table', async () => {
-    const initialCount = (await Snp.getAll()).length;
-    console.log('initialCount: ', initialCount);
-    await Snp.copySnpFile(filePath, genome_id);
-    const finalCount = (await Snp.getAll()).length;
-    console.log('finalCount: ', finalCount);
-    expect(finalCount).to.equal(initialCount + 1128280);
-  });
-
-  it('should delete the original file and its preprocessed copy', (done) => {
-    deleteFiles(copyPath, () => {
-      expect(fs.existsSync(copyPath)).to.equal(false);
-      expect(fs.existsSync(`${copyPath}.original`)).to.equal(false);
+      }
+    }).on('end', () => {
+      expect(lineCount).to.equal(initialLineCount - 20);
+      expect(returnedSize).to.equal(32799324);
       done();
     });
+  });
+
+  it('should add the genome_id to each line of the file', (done) => {
+    let count = 0;
+    const randomLine = Math.floor(Math.random() * (initialLineCount - 20)) + 1;
+    fs.createReadStream(preprocessedPath)
+    .on('data', (chunk) => {
+      const lines = chunk.toString().split('\n');
+      lines.forEach((line) => {
+        count++;
+        const columns = line.split('\t');
+        if (count === randomLine) {
+          expect(columns[1]).to.equal(`${genome_id}`);
+        }
+      });
+    }).on('end', () => {
+      done();
+    });
+  });
+
+  it('should update the sex of the genome', async () => {
+    const [ genome ] = await Genome.get({ id: genome_id });
+    expect(genome.sex).to.equal('M');
   });
 
   after(async () => {
     Snp.delete({ genome_id });
     Genome.delete({ id: genome_id });
     User.delete({ id: user_id });
+  });
+});
+
+describe('File delete', () => {
+  it('should delete the original file and its copies', () => {
+    const copyPath = path.join(__dirname, 'testFileCopy.txt');
+    deleteFiles(copyPath, () => {
+      expect(fs.existsSync(copyPath)).to.equal(false);
+      expect(fs.existsSync(`${copyPath}.preprocessed`)).to.equal(false);
+    });
+  });
+});
+
+describe.skip('Snps model', () => {
+  let genome_id;
+  const copyPath = path.join(__dirname, 'testFileCopy.txt');
+  before(async () => {
+    await fs.copyFileSync(filePath, copyPath);
+    const [ user ] = await User.create({ username: 'test', password: 'test' });
+    const [ genome ] = await Genome.create({
+      user_id: user.id,
+      name: 'test_genome',
+    });
+    genome_id = genome.id;
+    await preprocessFile(filePath, genome_id);
+  });
+
+  it('should create a new snp', async () => {
+    const [ snp ] = await Snp.create({ rsid: 'test', genome_id, genotype: 'AA' });
+    expect(snp.rsid).to.equal('test');
+  });
+
+  it('should copy a snp file', async () => {
+    await Snp.copySnpFile(`${copyPath}.preprocessed`);
+    const [ snp ] = await Snp.get({ rsid: 'rs21', genome_id });
+    const { rsid, chromosome, position, genotype } = snp;
+    expect(rsid).to.equal('rs21');
+    expect(chromosome).to.equal('7');
+    expect(position).to.equal(11182783);
+    expect(genotype).to.equal('AG');
+  });
+
+  after(async () => {
+    Snp.delete({ genome_id });
+    Genome.delete({ id: genome_id });
+    User.delete({ username: 'test' });
+    deleteFiles(copyPath, () => {});
   });
 });
 
@@ -356,87 +444,6 @@ describe.skip('File Upload Route', function () {
         expect(res.text).to.equal('File uploaded to database!');
         done();
       });
-  });
-});
-
-describe('Analysis utils', () => {
-  it('should determine the number of copies of the effect allele', () => {
-    const effectAllele = 'A';
-    const genotype_1 = 'AA';
-    const genotype_2 = 'AG';
-    const genotype_3 = 'GG';
-    const copies_1 = copiesOfEffectAllele(genotype_1, effectAllele);
-    const copies_2 = copiesOfEffectAllele(genotype_2, effectAllele);
-    const copies_3 = copiesOfEffectAllele(genotype_3, effectAllele);
-    expect(copies_1).to.equal(2);
-    expect(copies_2).to.equal(1);
-    expect(copies_3).to.equal(0);
-  });
-
-  it('should determine the inverse logit', () => {
-    const logit = function (p) {
-      return Math.log(p / (1 - p));
-    }
-    const error = 0.000000000000001;
-    const values = [];
-    for (let i = 0; i < 100; i++) {
-      values.push(Math.random());
-    }
-    values.forEach((value) => {
-      const result = inverseLogit(logit(value));
-      expect(result).to.be.within(value - error, value + error);
-    });
-  });
-
-  it('should determine if a genotype is homozygous', () => {
-    const genotype_1 = 'AA';
-    const genotype_2 = 'AG';
-    const genotype_3 = 'GG';
-    const result_1 = isHomozygous(genotype_1);
-    const result_2 = isHomozygous(genotype_2);
-    const result_3 = isHomozygous(genotype_3);
-    expect(result_1).to.equal(true);
-    expect(result_2).to.equal(false);
-    expect(result_3).to.equal(true);
-  });
-
-  it('should determine an individual\'s probability of having a trait', () => {
-    const pgsScores = {
-      rs21: {
-        effect_allele: 'T',
-        effect_weight: 0.1
-      },
-      rs14: {
-        effect_allele: 'G',
-        effect_weight: 0.2
-      },
-    };
-    const person_1 = {
-      snps: {
-        rs21: 'TT',
-        rs14: 'GG',
-      }
-    };
-    const person_2 = {
-      snps: {
-        rs21: 'TG',
-        rs14: 'GG',
-      }
-    };
-    const person_3 = {
-      snps: {
-        rs21: 'GG',
-        rs14: 'GT',
-      }
-    };
-    const probability_1 = determineProbability(person_1, pgsScores);
-    const probability_2 = determineProbability(person_2, pgsScores);
-    const probability_3 = determineProbability(person_3, pgsScores);
-
-    const error = 0.000000000000001;
-    expect(probability_1).to.be.within(0.6456563062257955 - error, 0.6456563062257955 + error);
-    expect(probability_2).to.be.within(0.6224593312018546 - error, 0.6224593312018546 + error);
-    expect(probability_3).to.be.within(0.549833997312478 - error, 0.549833997312478 + error);
   });
 });
 

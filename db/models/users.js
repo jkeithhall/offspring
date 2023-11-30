@@ -1,4 +1,4 @@
-import { createHash, compareHash, createRandom32String } from './hashutils.js';
+import { createHash, compareHash, createRandom32String } from '../hashutils.js';
 import Model from './models.js';
 
 class UserModel extends Model {

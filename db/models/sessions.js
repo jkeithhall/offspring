@@ -1,4 +1,4 @@
-import { createHash, createRandom32String } from './hashutils.js';
+import { createHash, createRandom32String } from '../hashutils.js';
 import Model from './models.js';
 import User from './users.js';
 import { faker } from '@faker-js/faker';

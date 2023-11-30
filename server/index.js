@@ -7,7 +7,7 @@ import { uploadFile } from './controllers.js';
 import { getSocketKey, createSession } from './lib.js';
 
 dotenv.config();
-const { PORT } = process.env;
+const { PORT, ANALYSIS_API_KEY, ANALYSIS_URL } = process.env;
 
 export const app = express();
 expressWS(app);
@@ -45,6 +45,23 @@ app.post('/api/genome', async (req, res) => {
     console.error(err);
     res.status(500).send(`ERROR: ${err.message}`);
   }
+});
+
+app.get('api/analysis', (req, res) => {
+  const { pgs_id } = req.query;
+  axios.get(`${ANALYSIS_URL}/api/analysis?pgs_id=${pgs_id}`, {
+    headers: {
+      Authorization: `Bearer ${ANALYSIS_API_KEY}`
+    }
+  })
+    .then((response) => {
+      const { histogram } = response.data;
+      res.status(200).send({ histogram });
+    })
+    .catch((err) => {
+      console.error(err);
+      res.status(500).send(`ERROR: ${err.message}`);
+    });
 });
 
 app.listen(PORT, () => {
