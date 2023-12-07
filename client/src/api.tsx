@@ -10,3 +10,9 @@ export async function uploadFile (name, file, cb) {
     .then((res) => { console.log(res.data); })
     .catch((err) => { console.log(err); });
 };
+
+export async function getGenomes () {
+  const { data } = await axios.get('http://localhost:3000/api/genomes');
+  const { availableGenomes } = data;
+  return availableGenomes;
+}

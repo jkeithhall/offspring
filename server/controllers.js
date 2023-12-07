@@ -1,3 +1,4 @@
+import dotenv from 'dotenv';
 import { client, connectToDB } from '../db/index.js';
 import { IncomingForm } from 'formidable';
 import Genome from '../db/models/genomes.js';
@@ -6,12 +7,19 @@ import { monitorUploadProgress } from '../db/monitoring.js';
 import { preprocessFile, deleteFiles } from './lib.js';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
+import axios from 'axios';
+import PgsScoreModel from '../db/analysisDB.js';
+import { sockets } from './index.js';
 
+dotenv.config();
+
+const { ANALYSIS_API_KEY, ANALYSIS_URL } = process.env;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-export async function uploadFile (socket, req, res) {
-  const { session } = req;
+export async function uploadFile (req, res) {
+  const { socketKey, session } = req;
+  const socket = sockets[socketKey];
   const { user_id } = session;
   const { name } = req.query;
 
@@ -41,8 +49,8 @@ export async function uploadFile (socket, req, res) {
       const [ genome ] = await Genome.create({ user_id, name });
       const genome_id = genome.id;
 
-      // Preprocess file (remove comments, add genome_id, determine sex and file size)
-      const { sex, size } = await preprocessFile(filepath, genome_id);
+      // Preprocess file (remove comments; add genome_id; determine sex, file size, and chip version)
+      const { size } = await preprocessFile(filepath, genome_id);
 
       // Upload preprocessed file and monitor upload progress
       refreshIntervalId = await monitorUploadProgress(socket, size);
@@ -62,3 +70,63 @@ export async function uploadFile (socket, req, res) {
     }
   });
 };
+
+export async function getUploadedGenomes (req, res) {
+  try {
+    const { session } = req;
+    const { user_id } = session;
+    const genomes = await Genome.getAll({ user_id });
+    const availableGenomes = [];
+    for (const genome of genomes) {
+      const { name, sex, chip } = genome;
+      availableGenomes.push({ name, sex, chip });
+    }
+    res.status(200).send({ availableGenomes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send(`ERROR: ${err.message}`);
+  }
+}
+
+export async function getAnalysis (req, res) {
+  try {
+    const { pgs_id } = req.params;
+    const { name_1, name_2 } = req.query;
+    const user_id = req.session.user_id;
+    const [ genome_1 ] = await Genome.get({ user_id, name: name_1 });
+    const [ genome_2 ] = await Genome.get({ user_id, name: name_2 });
+    const { data } = await axios.get(`${ANALYSIS_URL}/api/analysis?pgs_id=${pgs_id}&genome_id_1=${genome_1.id}&genome_id_2=${genome_2.id}`, {
+      headers: {
+        Authorization: `Bearer ${ANALYSIS_API_KEY}`
+      }
+    });
+    res.status(200).send(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send(`ERROR: ${err.message}`);
+  }
+}
+
+export async function getAllAnalyses (req, res) {
+  try {
+    const docs = await PgsScoreModel.find({}, 'id name');
+    const analyses = docs.map(doc => ({ pgs_id: doc.id, name: doc.name }));
+    res.status(200).send(analyses);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send(`ERROR: ${err.message}`);
+  }
+}
+
+export async function createSocket(socket, req) {
+  try {
+    const { socketKey } = req;
+    sockets[socketKey] = socket;
+
+    socket.on('close', () => {
+      delete sockets[socketKey];
+    });
+  } catch (err) {
+    console.error(err);
+  }
+}

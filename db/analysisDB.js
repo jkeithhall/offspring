@@ -36,6 +36,7 @@ const pgsScoreSchema = new Schema({
     variants_number: { type: Number, require: true },
     intercept: { type: Number, require: true },
   });
+
 const PgsScoreModel = mongoose.model('PgsScoreModel', pgsScoreSchema, 'pgs_scores');
 
 mongoose.connect(process.env.MONGODB_URI);

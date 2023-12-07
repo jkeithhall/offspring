@@ -10,6 +10,7 @@ export function preprocessFile (filepath, genome_id) {
   return new Promise((resolve, reject) => {
 
     let sex;
+    let chip = 'v4'; // Default to v4
 
     const input = createReadStream(filepath);
     const output = createWriteStream(`${filepath}.preprocessed`);
@@ -26,6 +27,9 @@ export function preprocessFile (filepath, genome_id) {
         if (sex === undefined && chromosome === 'Y') {
           sex = 'M';
         }
+        if (rsid = 'rs10440635') {
+          chip = 'v5';
+        }
         columns.splice(1, 0, genome_id);
         const modifiedLine = columns.join('\t') + '\n';
         output.write(modifiedLine);
@@ -39,7 +43,7 @@ export function preprocessFile (filepath, genome_id) {
 
       // Get new file size
       const size = await getFileSize(`${filepath}.preprocessed`);
-      resolve({ sex, size });
+      resolve({ sex, size, chip });
     });
 
     rl.on('error', error => {

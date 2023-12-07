@@ -1,8 +1,7 @@
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import LinearWithValueLabel from "./LinearProgressBar";
-import React from "react";
 
-export default function DragDropFile({handleFile}) {
+export default function DragDropFile({handleFile, setUploadCount}) {
   const [dragActive, setDragActive] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [name, setName] = useState("");
@@ -26,6 +25,10 @@ export default function DragDropFile({handleFile}) {
       console.log("File dropped");
       handleFile(name, e.dataTransfer.files, (msg) => {
         const { data } = msg;
+        if (data === "100") {
+          setUploadCount((prev) => prev + 1);
+          setUploadProgress(0);
+        }
         setUploadProgress(parseFloat(data));
       });
     }
@@ -37,6 +40,10 @@ export default function DragDropFile({handleFile}) {
       console.log("File selected for upload");
       handleFile(name, e.dataTransfer.files, (msg) => {
         const { data } = msg;
+        if (data === "100") {
+          setUploadCount((prev) => prev + 1);
+          setUploadProgress(0);
+        }
         setUploadProgress(parseFloat(data));
       });
     }

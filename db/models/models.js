@@ -30,7 +30,8 @@ class Model {
       return executeQuery(queryString);
     } else {
       const parsedOptions = parseOptions(options);
-      let queryString = `SELECT * FROM ${this.tablename} WHERE ${parsedOptions.string.join(' AND ')}`;
+      const filterString = parsedOptions.string.map((key, index) => `${key} = $${index + 1}`).join(' AND ');
+      let queryString = `SELECT * FROM ${this.tablename} WHERE ${filterString}`;
       return executeQuery(queryString, parsedOptions.values);
     }
   }

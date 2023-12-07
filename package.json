@@ -11,8 +11,7 @@
     "build": "webpack --mode=production --node-env=production",
     "build:dev": "webpack --mode=development --watch",
     "build:prod": "webpack --mode=production --node-env=production",
-    "watch": "webpack --watch",
-    "server": "nodemon server/index.js --watch"
+    "server:dev": "nodemon server/index.js --watch"
   },
   "repository": {
     "type": "git",
@@ -52,6 +51,7 @@
     "express-ws": "^5.0.2",
     "formidable": "^3.5.1",
     "mocha": "^10.2.0",
+    "mongoose": "^8.0.2",
     "nodemon": "^3.0.1",
     "pg": "^8.11.3",
     "pg-copy-streams": "^6.0.6",
