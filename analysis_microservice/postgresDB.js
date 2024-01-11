@@ -12,8 +12,8 @@ const clientConfig = {
     database: process.env.DB_DATABASE_NAME,
   }
 
-const client = new Client(clientConfig);
-client.connect((err) => {
+const pgClient = new Client(clientConfig);
+pgClient.connect((err) => {
   if (err) {
     console.log('Error connecting to Postgres DB: ', err);
     throw err;
@@ -22,4 +22,4 @@ client.connect((err) => {
   }
 });
 
-export default client;
+export default pgClient;

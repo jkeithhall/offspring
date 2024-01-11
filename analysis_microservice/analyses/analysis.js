@@ -24,13 +24,17 @@ export default class Analysis {
       // Run Monte Carlo simulation for child probabilities
       const SIMULATION_COUNT = 20000;
       const childPdf = await this.runMonteCarloSimulation(SIMULATION_COUNT);
+      const series = [[]];
+      for (const bucket in childPdf) {
+        series[0].push({ x: parseFloat(bucket), y: childPdf[bucket] });
+      }
 
       // Determine parent probabilities
       const { parent_1_probability, parent_2_probability } = this.determineParentProbabilities();
 
       // Return analysis results
       const { publication, trait_efo, variants_number } = this;
-      return { publication, trait_efo, variants_number, childPdf, parent_1_probability, parent_2_probability };
+      return { publication, trait_efo, variants_number, series, parent_1_probability, parent_2_probability };
     } catch (err) {
       console.error(err);
       throw err;
@@ -133,118 +137,6 @@ export default class Analysis {
     } catch (err) {
       throw err;
     }
-  }
-
-  // DEPRECATED
-  async determineSnpWeights() {
-    try {
-      let count = 0;
-      console.log('Determining SNP weights');
-      const children = [ { histogramWeight: 1, snps: {}, probability: null } ];
-
-      for (const rsid of this.pgsScores.keys()) {
-        const genome_id_1 = this.parent_1.genome_id;
-        const genotype_1 = await fetchSnp(genome_id_1, rsid, this.parent_1.chip);
-        this.parent_1.snps[rsid] = genotype_1;
-
-        const genome_id_2 = this.parent_2.genome_id;
-        const genotype_2 = await fetchSnp(genome_id_2, rsid, this.parent_2.chip);
-        this.parent_2.snps[rsid] = genotype_2;
-
-        console.log(`Genotypes: ${genotype_1} ${genotype_2} (${++count}/${this.pgsScores.size})`);
-        if (genotype_1 === '--' || genotype_2 === '--') {
-          // If one parent is missing the SNP, assign all children null genotype for that SNP
-          for (const child of children) {
-            child.snps[rsid] = '--';
-          }
-        }
-        // If both parents are homozygous for the same allele, all children will be homozygous for that allele
-        // and we can use one child that counts for 4x the weight in the histogram
-        else if (genotype_1 === genotype_2 && isHomozygous(genotype_1) && isHomozygous(genotype_2)) {
-          for (const child of children) {
-            child.snps[rsid] = genotype_1;
-            child.histogramWeight *= 4;
-          }
-        // If one parent is homozygous, split each child into 2 new children with 2x the histogram weight,
-        // one with the homozygous genotype and one with the heterozygous genotype
-        } else if (isHomozygous(genotype_1) || isHomozygous(genotype_2)) {
-          const homozygousGenotype = isHomozygous(genotype_1) ? genotype_1 : genotype_2;
-          const heterozygousGenotype = isHomozygous(genotype_1) ? genotype_2 : genotype_1;
-          const newGenotype_1 = homozygousGenotype[0] + heterozygousGenotype[0];
-          const newGenotype_2 = homozygousGenotype[0] + heterozygousGenotype[1];
-
-          for (var i = 0; i < children.length; i += 2) {
-            const originalChild = children[i];
-            const { histogramWeight, snps } = originalChild;
-            children.splice(i, 1);
-            const newChild_1 = structuredClone(originalChild);
-            const newChild_2 = structuredClone(originalChild);
-            newChild_1.snps[rsid] = newGenotype_1;
-            newChild_1.histogramWeight *= 2;
-            newChild_2.snps[rsid] = newGenotype_2;
-            newChild_2.histogramWeight *= 2;
-            children.splice(i, 0, newChild_1, newChild_2);
-          }
-          // Otherwise, split each child into 4 new children, each containing one possible combination of alleles
-        } else {
-          for (var i = 0; i < children.length; i += 4) {
-            const originalChild = children[i];
-            const { histogramWeight, snps } = originalChild;
-            children.splice(i, 1);
-            for (const allele_1 of genotype_1) {
-              for (const allele_2 of genotype_2) {
-                const childGenotype = allele_1 + allele_2;
-                const newChild = structuredClone(originalChild);
-                newChild.snps[rsid] = childGenotype;
-                children.splice(i, 0, newChild);
-              }
-            }
-          }
-        }
-        console.log('Children:', children.length);
-      }
-      this.children = children;
-    } catch (err) {
-      throw err;
-    }
-  }
-
-  // DEPRECATED
-  determineChildProbabilities() {
-    console.log('Determining child probabilities');
-    // Determine min and max probabilities
-    const maxLogOdds = [...this.PgsScores.entries()].reduce((prevLogOdds, [rsid, { effect_allele, effect_weight, allelefrequency_effect }]) => {
-      return prevLogOdds + 2 * effect_weight;
-    }, 0);
-    const maxProbability = inverseLogit(maxLogOdds + this.intercept);
-    const minLogOdds = [...this.PgsScores.entries()].reduce((prevLogOdds, [rsid, { effect_allele, effect_weight, allelefrequency_effect }]) => {
-      return effect_weight < 0 ? prevLogOdds + 2 * effect_weight : prevLogOdds;
-    }, 0);
-    const minProbability = inverseLogOdds(minLogOdds + this.intercept);
-
-    for (const child of this.children) {
-      const probability = determineProbability(child, this.pgsScores, this.intercept);
-      child.probability = probability;
-    }
-
-    const bucketSize = (maxProbability - minProbability) / 20;
-    const precision = (maxProbability - minProbability) < 0.01 ? 3 : 2;
-    const probabilityBuckets = {};
-    for (var i = Math.floor(minProbability); i < Math.ceil(maxProbability); i += bucketSize) {
-      const bucket = i.toFixed(precision);
-      probabilityBuckets[bucket] = 0;
-    }
-
-    for (const child of this.children) {
-      for (const bucket in probabilityBuckets) {
-        if (child.probability >= parseFloat(bucket) && child.probability < parseFloat(bucket) + bucketSize) {
-          probabilityBuckets[bucket] += child.histogramWeight;
-          break;
-        }
-      }
-    }
-
-    return probabilityBuckets;
   }
 
   determineParentProbabilities() {

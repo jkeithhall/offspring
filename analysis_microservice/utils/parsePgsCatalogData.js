@@ -10,7 +10,6 @@ const __dirname = dirname(__filename);
 const determineIntercept = function(pgsScores, populationPrevalence) {
   const populationLogOdds = Math.log(populationPrevalence / (1 - populationPrevalence));
   const pgsLogOdds = Array.from(pgsScores.values()).reduce((prevLogOdds, { effect_weight, allelefrequency_effect }) => {
-    // Unsure about this part of the calculation...
     return prevLogOdds + 2 * effect_weight * allelefrequency_effect;
   }, 0);
   return populationLogOdds - pgsLogOdds;
@@ -57,7 +56,8 @@ export default function parsePgsCatalogData(data, populationPrevalence) {
           const rsid = columns[rsidIdx];
           const effect_allele = columns[effectAlleleIdx];
           const effect_weight = columns[effectWeightIdx];
-          const allelefrequency_effect = columns[alleleFreqIdx];
+          if (effect_weight ===)
+          const allelefrequency_effect = alleleFreqIdx > -1 ? columns[alleleFreqIdx] : 1;
           pgsScores.set(rsid, { effect_allele, effect_weight, allelefrequency_effect });
         }
       }
@@ -70,8 +70,6 @@ export default function parsePgsCatalogData(data, populationPrevalence) {
 
         // Determine intercept
         const intercept = determineIntercept(pgsScores, populationPrevalence);
-        console.log('Intercept:', intercept);
-        console.log('Finished parsing PGS Catalog data');
         resolve({ id, name, pgsScores, publication, trait_efo, variants_number, intercept });
       });
       rl.on('error', error => {

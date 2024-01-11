@@ -39,11 +39,11 @@ export function preprocessFile (filepath, genome_id) {
     rl.on('close', async () => {
       // Update genome with sex
       if (sex === undefined) { sex = 'F'; }
-      await Genome.update({ id: genome_id }, { sex });
+      await Genome.update({ id: genome_id }, { sex, chip });
 
       // Get new file size
       const size = await getFileSize(`${filepath}.preprocessed`);
-      resolve({ sex, size, chip });
+      resolve({ size });
     });
 
     rl.on('error', error => {

@@ -23,7 +23,7 @@ export default function App() {
         < DragDropFile handleFile={uploadFile} setUploadCount={setGenomeUploadCount}/>
         < DragDropFile handleFile={uploadFile} setUploadCount={setGenomeUploadCount}/>
       </div>}
-      {availableGenomes.length && <div className="genome-drop-down">
+      {availableGenomes.length > 0 && <div className="genome-drop-down">
         <select>
           {availableGenomes.map((genome) => {
             const { name, chip } = genome;
@@ -31,7 +31,7 @@ export default function App() {
           })}
         </select>
       </div>}
-      {availableGenomes.length && <div className="genome-drop-down">
+      {availableGenomes.length > 0 && <div className="genome-drop-down">
         <select>
           {availableGenomes.map((genome) => {
             const { name, chip } = genome;
